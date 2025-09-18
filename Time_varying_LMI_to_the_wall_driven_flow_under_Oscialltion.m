@@ -137,10 +137,10 @@ N_2 = [Z_2 Z_2;
 p = H * exp(G*(y+1)) * (N_1 + N_2*exp(2*G))^(-1) * b;
 W_s = p(1);
 W_c = p(2);
-
+R_w_divide_R = 1e-4;
 omega_zero = 2*pi/L;
 
-W_yi = 2*(W_c*cos(omeg*t/Re) + W_s*sin(omeg*t/Re));
+W_yi = 2*R_w_divide_R*(W_c*cos(omeg*t/Re) + W_s*sin(omeg*t/Re));
 W_m_yi = diff(W_yi, y);  
 W_m2_yi = diff(W_m_yi, y);
 W_yi_sub  = subs(W_yi,  y, x);
@@ -333,3 +333,4 @@ D4_stencil(end,end)=D4_stencil(end,end)+1;
 
 D4=D4_stencil/dx^4;
 end
+
