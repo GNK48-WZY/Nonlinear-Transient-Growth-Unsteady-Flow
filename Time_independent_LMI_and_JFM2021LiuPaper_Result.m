@@ -4,36 +4,37 @@
 
 % clear; clc;
 % FD parameters
-N  = 5;       % total FD grid points including boundaries
+N  = 4;       % total FD grid points including boundaries
 L  = 2;        % domain length [-1,1]
 Re = 358;
 flowType = 'couette';
 
 % Spectral ranges (as in paper)
-kx_list = logspace(-4, 0.48, 5);
-kz_list = logspace(-2, 1.2, 5);
-
+kx_list = logspace(-4, 0.48, 16);
+% kx_list = 0.0016;
+kz_list = logspace(-2, 1.2, 16);
+% kz_list = 1.3594;
 % Delta list (can be more values if needed)
-delta_list = logspace(-6, 0, 1);
+% delta_list = logspace(-6, 0, 1);
 % T = 200;
 % t0 = 0;
 % dt = 0.1;
 % t_steps = (T-t0)/dt;
-results = cell(length(kx_list), length(kz_list), length(delta_list));
+results = cell(length(kx_list), length(kz_list));
 delete(gcp('nocreate'));
-% parpool(4);
+parpool(8);
 
 %% Main loop
-for i_kx = 1:length(kx_list)
-    [local_results] = Inside_loop(N, L, Re, kz_list, flowType, delta_list, i_kx, kx_list);
+parfor i_kx = 1:length(kx_list)
+    [local_results] = Inside_loop(N, L, Re, kz_list, flowType, i_kx, kx_list);
     results(i_kx,:) = local_results;
 end
 
 %% Save everything
 disp('successful')
-save('mu_full_scan_results.mat','results','kx_list','kz_list','delta_list')
+% save('mu_full_scan_results.mat','results','kx_list','kz_list')
 
-function [local_results]= Inside_loop(N, L, Re, kz_list, flowType, delta_list,i_kx, kx_list)
+function [local_results]= Inside_loop(N, L, Re, kz_list, flowType,i_kx, kx_list)
      local_results = cell(1, length(kz_list));
      for j_kz = 1:length(kz_list)
 
@@ -52,26 +53,30 @@ function [local_results]= Inside_loop(N, L, Re, kz_list, flowType, delta_list,i_
             yalmip('clear');
 
              %% time-varying
+%             t_steps = 200;
+%             dt = 1;
 %             for j1=1:t_steps
 %                    P{j1}=sdpvar(n,n,'hermitian','complex');
+%                    sx{j1} = sdpvar(1,1); sy{j1} = sdpvar(1,1); sz{j1} = sdpvar(1,1);
 %             end
-%             sx = sdpvar(1,1); sy = sdpvar(1,1); sz = sdpvar(1,1);
+% %             sx = sdpvar(1,1); sy = sdpvar(1,1); sz = sdpvar(1,1);
 %             gamma_H_inf_complex2 = sdpvar(1,1);
-%             M = blkdiag(sx*eye(Ny), sy*eye(Ny), sz*eye(Ny));
-% 
+%             F = [];
 %             for j1=1:t_steps-1
+%                 M = blkdiag(sx{j1}*eye(Ny), sy{j1}*eye(Ny), sz{j1}*eye(Ny));
 %                 dP_dt = (P{j1 + 1}-P{j1})/dt;
 %                 dV_ineq = [dP_dt + operator.A'*P{j1} + P{j1}*operator.A ...
-%                         + sx*operator.C_grad_u'*operator.C_grad_u ...
-%                         + sy*operator.C_grad_v'*operator.C_grad_v ...
-%                         + sz*operator.C_grad_w'*operator.C_grad_w, ...
+%                         + sx{j1}*operator.C_grad_u'*operator.C_grad_u ...
+%                         + sy{j1}*operator.C_grad_v'*operator.C_grad_v ...
+%                         + sz{j1}*operator.C_grad_w'*operator.C_grad_w, ...
 %                         P{j1}*operator.B;
 %                         operator.B'*P{j1}, -gamma_H_inf_complex2*M];     
-%                 F = [P{j1} - 1e-3*eye(n) >= 0, dV_ineq <= 0, sx >= 0, sy >= 0, sz >= 0];    
+%                 F = [F, P{j1} - 1e-3*eye(n) >= 0, dV_ineq <= 0, sx{j1} >= 0, sy{j1} >= 0, sz{j1} >= 0];    
 %             end
 %             F=[F];
+     
 
-            %% time-independent
+            %% time-independent(Figure 4a)
             P = sdpvar(n,n,'hermitian','complex');
             sx = sdpvar(1,1); sy = sdpvar(1,1); sz = sdpvar(1,1);
             gamma_H_inf_complex2 = sdpvar(1,1);
@@ -85,12 +90,61 @@ function [local_results]= Inside_loop(N, L, Re, kz_list, flowType, delta_list,i_
                         P*operator.B;
                         operator.B'*P, -gamma_H_inf_complex2*M];
 
-            F = [P - 1e-3*eye(n) >= 0, dV_ineq <= 0, sx >= 0, sy >= 0, sz >= 0];
+            F = [P - 1e-2*eye(n) >= 0, dV_ineq <= 0, sx >= 0, sy >= 0, sz >= 0];
 
             sdp_options = sdpsettings('solver','mosek','cachesolvers',1);
             bisection(F,gamma_H_inf_complex2,sdp_options);
 
             mu_LMI = sqrt(value(gamma_H_inf_complex2));
+
+            %% (Figure 4b) with Gradient C and sx,sy,sz = 1
+%             P = sdpvar(n,n,'hermitian','complex');
+%             sx = 1; sy = 1; sz = 1;
+%             gamma_H_inf_complex2 = sdpvar(1,1);
+% 
+%             M = blkdiag(sx*eye(Ny), sy*eye(Ny), sz*eye(Ny));
+% 
+%             dV_ineq = [operator.A'*P + P*operator.A ...
+%                         + sx*operator.C_grad_u'*operator.C_grad_u ...
+%                         + sy*operator.C_grad_v'*operator.C_grad_v ...
+%                         + sz*operator.C_grad_w'*operator.C_grad_w, ...
+%                         P*operator.B;
+%                         operator.B'*P, -gamma_H_inf_complex2*M];
+% 
+%             F = [P - 1e-3*eye(n) >= 0, dV_ineq <= 0, sx >= 0, sy >= 0, sz >= 0];
+% 
+%             sdp_options = sdpsettings('solver','mosek','cachesolvers',1);
+%             bisection(F,gamma_H_inf_complex2,sdp_options);
+% 
+%             mu_LMI = sqrt(value(gamma_H_inf_complex2));
+
+            %% (Figure 4c) without Gradient C and sx,sy,sz = 1 
+
+%             P = sdpvar(n,n,'hermitian','complex');
+%             sx = 1; sy = 1; sz = 1;
+%             gamma_H_inf_complex2 = sdpvar(1,1);
+% 
+%             M = blkdiag(sx*eye(Ny), sy*eye(Ny), sz*eye(Ny));
+% 
+%             dV_ineq = [operator.A'*P + P*operator.A ...
+%                         + operator.C'*operator.C, ... 
+%                         P*operator.B;
+%                         operator.B'*P, -gamma_H_inf_complex2*M];
+% 
+%             F = [P - 1e-2*eye(n) >= 0, dV_ineq <= 0];
+% 
+% %             sdp_options = sdpsettings('solver','mosek','cachesolvers',1);
+%             sdp_options = sdpsettings('solver','mosek');
+%             bisection(F,gamma_H_inf_complex2,sdp_options);
+% 
+%             mu_LMI_2 = value(gamma_H_inf_complex2);
+%             mu_LMI = sqrt(mu_LMI_2);
+%             
+            %% H_inf norm
+            sys = ss(operator.A, operator.B, operator.C, zeros(size(operator.C,1), size(operator.B,2)));
+            hinf_norm = norm(sys, inf);
+
+%             G = C * inv(1i * omega * I - A) * B;
 
             %% === Mussv computation (pos/neg freq) ===
             C_all = [operator.C_grad_u;
@@ -124,7 +178,8 @@ function [local_results]= Inside_loop(N, L, Re, kz_list, flowType, delta_list,i_
                 'mu_upper_H_inf_grad', mu_upper_H_inf_grad, ...
                 'mu_upper_freq', mu_upper_freq, ...
                 'mu_upper_H_inf_grad_neg_freq', mu_upper_H_inf_grad_neg_freq, ...
-                'mu_upper_freq_neg_freq', mu_upper_freq_neg_freq ...
+                'mu_upper_freq_neg_freq', mu_upper_freq_neg_freq, ...
+                'hinf_norm', hinf_norm ...
             );
 %             local_results{i_kx,j_kz,ind_delta}.kx = kx;
 %             local_results{i_kx,j_kz,ind_delta}.kz = kz;
@@ -261,3 +316,7 @@ D4_stencil(end,end)=D4_stencil(end,end)+1;
 
 D4=D4_stencil/dx^4;
 end
+
+D4=D4_stencil/dx^4;
+end
+
