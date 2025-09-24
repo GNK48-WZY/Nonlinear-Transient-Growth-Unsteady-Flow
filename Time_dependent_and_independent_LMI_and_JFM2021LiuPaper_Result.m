@@ -74,6 +74,31 @@ function [local_results]= Inside_loop(N, L, Re, kz_list, flowType,i_kx, kx_list)
 %                 F = [F, P{j1} - 1e-3*eye(n) >= 0, dV_ineq <= 0, sx{j1} >= 0, sy{j1} >= 0, sz{j1} >= 0];    
 %             end
 %             F=[F];
+
+             %% time-varying for H_inf norm
+%             t_steps = 200;
+%             dt = 0.1;
+%             for j1=1:t_steps
+%                     P{j1}=sdpvar(n,n,'hermitian','complex');
+%              end
+%             sx = 1; sy = 1; sz = 1;
+%             gamma_H_inf_complex2 = sdpvar(1,1);
+%             F = [];
+%             for j1 = 1:t_steps-1
+%                 M = blkdiag(sx*eye(Ny), sy*eye(Ny), sz*eye(Ny));
+%                 dP_dt = (P{j1 + 1}-P{j1})/dt;
+%                 dV_ineq = [dP_dt + operator.A'*P{j1} + P{j1}*operator.A ...
+%                          + operator.C'*operator.C, ... 
+%                          P{j1}*operator.B;
+%                          operator.B'*P{j1}, -gamma_H_inf_complex2*M];
+% 
+%                 F = [F, P{j1} - 1e-3*eye(n) >= 0, dV_ineq <= 0];
+%             end
+%             F = [F];
+%             sdp_options = sdpsettings('solver','mosek','cachesolvers',1);
+%             bisection(F,gamma_H_inf_complex2,sdp_options);
+% 
+%             mu_LMI = sqrt(value(gamma_H_inf_complex2));
      
 
             %% time-independent(Figure 4a)
@@ -319,4 +344,5 @@ end
 
 D4=D4_stencil/dx^4;
 end
+
 
